@@ -61,6 +61,30 @@ function store_redirect(from, to) {
   fs.closeSync(redirects);
 }
 
+function url_to_file(src_url, not_dir) {
+  var page_url = url.parse(src_url);
+  if(not_dir) {
+    console.log("not making this a directory: "+src_url)
+  } else {
+    // Add a slash if the path is not a file (does not end in a slash and does not have a dot)
+    var components = page_url.path.split("/");
+    if(!page_url.path.match(/\/$/) && !components[components.length-1].match(/\./)) {
+      page_url.path += "/";
+    }
+  }
+  // Add "index.html" if the path ends in a slash
+  if(page_url.path.match(/\/$/)) {
+    page_url.path += "index.html";
+  }
+
+  // The path will now always end in a filename
+  // Split the path on / and remove the filename to create the directory
+  components = page_url.path.split("/");
+  var filename = components.pop();
+  var path_components = components.join("/");
+  var dirname = output_dir + path_components + "/";
+  return [filename,dirname]
+}
 
 function process_link(current) {
 
@@ -115,27 +139,7 @@ function process_link(current) {
         console.log("Was redirected to: "+current);
       }
 
-      var page_url = url.parse(current);
-      if(response.headers['content-type'] && response.headers['content-type'].match(/image/)) {
-        console.log("not making this a directory: "+response.headers['content-type'])
-      } else {
-        // Add a slash if the path is not a file (does not end in a slash and does not have a dot)
-        var components = page_url.path.split("/");
-        if(!page_url.path.match(/\/$/) && !components[components.length-1].match(/\./)) {
-          page_url.path += "/";
-        }
-      }
-      // Add "index.html" if the path ends in a slash
-      if(page_url.path.match(/\/$/)) {
-        page_url.path += "index.html";
-      }
-
-      // The path will now always end in a filename
-      // Split the path on / and remove the filename to create the directory
-      components = page_url.path.split("/");
-      var filename = components.pop();
-      var path_components = components.join("/");
-      var dirname = output_dir + path_components + "/";
+      var [filename,dirname] = url_to_file(current,response.headers['content-type'] && response.headers['content-type'].match(/image/))
       console.log("Filename: "+filename);
       console.log("Directory: "+dirname);
 
