@@ -97,78 +97,7 @@ function queue_html(content){
     var img = $("img");
     enqueue_links($, img, "src");        
 }
-
-function process_link(current) {
-    
-  var [checkfile,checkdir] = url_to_file(current,false)
-  try {
-    var content = fs.readFileSync(checkdir+checkfile,'utf8');
-    visited[current] = true;
-    console.log("got "+current +" already");
-    if (content.match(/401 Authorization Required/)) {
-        console.log("but "+current +" is a 401 bad file");
-          request({
-            url: 'https://mention.tech/getfromarchive?url='+current,
-            timeout: http_timeout,
-          }, function(error,response,body) {
-
-            if(error) {
-              console.log(error);
-            } else if(response.statusCode == 404) {
-              console.log("404 Not Found in internet archive for "+current);
-            } else {
-              console.log("internet archive had "+current);
-              if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
-                fs.writeFileSync(checkdir+checkfile, body, 'utf8');
-              } else {
-                request.get(current).pipe(fs.createWriteStream(checkdir+checkfile));
-              }
-                if (checkfile.match(/html/) || body.match(/html/)) {
-                    queue_html(body)       
-                }             
-            }
-        })
-    }
-    if (checkfile.match(/html/) || content.match(/html/)) {
-        queue_html(content)       
-    }
-    
-  } catch(err){
-    if (err.code != 'ENOENT'){
-        console.log(err);
-        if (err.code == 'ENAMETOOLONG'){
-            visited[current] = true;
-            console.log("skipping because this is not a good link")
-        }            
-    }        
-  }
-  
-  if(visited[current] == true) {
-    // console.log("Already visited!");
-    ready = true;
-    running--;
-    return;
-  }
-
-  console.log("===============================");
-  console.log("Processing: " + current);
-
-  visited[current] = true;
-
-  request({
-    url: current,
-    timeout: http_timeout,
-    followRedirect: function(response) {
-      var redirect = url.parse(response.headers.location);
-      if(redirect.host == host) {
-        return true;
-      } else {
-        ready = true;
-        //running--;
-        return false;
-      }
-    }
-  }, function(error,response,body) {
+function save_and_queue(current,error,response,body) {
 
     if(error) {
       console.log(error);
@@ -179,7 +108,13 @@ function process_link(current) {
       ready = true;
       running--;
     } else if(response.statusCode == 401) {
-      console.log("401 Permission Denied");
+      console.log("401 Permission Denied for "+current);
+      request({
+            url: 'https://mention.tech/getfromarchive?url='+current,
+            timeout: http_timeout,
+          }, function(error,response,body) {
+                save_and_queue_archive(current,error,response,body)
+        })
       ready = true;
       running--;
     } else {
@@ -234,7 +169,85 @@ function process_link(current) {
       ready = true;
       running--;
     }
-  });
+  }
+  
+function save_and_queue_archive(current,error,response,body) {
+
+    if(error) {
+      console.log(error);
+    } else if(response.statusCode == 404) {
+      console.log("404 Not Found in internet archive for "+current);
+    } else {
+      console.log("internet archive had "+current);
+      var [filename,dirname] = url_to_file(current,response.headers['content-type'] && response.headers['content-type'].match(/image/))
+      if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
+        fs.writeFileSync(dirname+filename, body, 'utf8');
+      } else {
+        request.get(current).pipe(fs.createWriteStream(dirname+filename));
+      }
+        if (filename.match(/html/) || body.match(/html/)) {
+            queue_html(body)       
+        }             
+    }
+}
+function process_link(current) {
+    
+  var [checkfile,checkdir] = url_to_file(current,false)
+  try {
+    var content = fs.readFileSync(checkdir+checkfile,'utf8');
+    visited[current] = true;
+    console.log("got "+current +" already");
+    if (content.match(/401 Authorization Required/)) {
+        console.log("but "+current +" is a 401 bad file");
+          request({
+            url: 'https://mention.tech/getfromarchive?url='+current,
+            timeout: http_timeout,
+          }, function(error,response,body) {
+                save_and_queue_archive(current,error,response,body)
+        })
+    }
+    if (checkfile.match(/html/) || content.match(/html/)) {
+        queue_html(content)       
+    }
+    
+  } catch(err){
+    if (err.code != 'ENOENT'){
+        console.log(err);
+        if (err.code == 'ENAMETOOLONG'){
+            visited[current] = true;
+            console.log("skipping because this is not a good link")
+        }            
+    }        
+  }
+  
+  if(visited[current] == true) {
+    // console.log("Already visited!");
+    ready = true;
+    running--;
+    return;
+  }
+
+  console.log("===============================");
+  console.log("Processing: " + current);
+
+  visited[current] = true;
+
+  request({
+    url: current,
+    timeout: http_timeout,
+    followRedirect: function(response) {
+      var redirect = url.parse(response.headers.location);
+      if(redirect.host == host) {
+        return true;
+      } else {
+        ready = true;
+        //running--;
+        return false;
+      }
+    }
+  }, function(error,response,body) {
+        save_and_queue(current,error,response,body)
+        });
 
 }
 
