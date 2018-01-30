@@ -87,7 +87,18 @@ function url_to_file(src_url, not_dir) {
 }
 
 function process_link(current) {
-
+    
+  var [checkfile,checkdir] = url_to_file(current,false)
+  try {
+    var content = fs.readFileSync(checkdir+checkfile,'utf8');
+    visited[current] = true;
+    console.log("got "+current +" already");
+  } catch(err){
+    if (err.code != 'ENOENT'){
+        console.log(err);
+    }        
+  }
+  
   if(visited[current] == true) {
     // console.log("Already visited!");
     ready = true;
