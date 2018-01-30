@@ -115,12 +115,13 @@ function process_link(current) {
             if(error) {
               console.log(error);
             } else if(response.statusCode == 404) {
-              console.log("404 Not Found");
+              console.log("404 Not Found in internet archive for "+current);
             } else {
+              console.log("internet archive had "+current);
               if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
-                fs.writeFileSync(dirname+filename, body, 'utf8');
+                fs.writeFileSync(checkdir+checkfile, body, 'utf8');
               } else {
-                request.get(current).pipe(fs.createWriteStream(dirname+filename));
+                request.get(current).pipe(fs.createWriteStream(checkdir+checkfile));
               }
                 if (checkfile.match(/html/) || body.match(/html/)) {
                     queue_html(body)       
