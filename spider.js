@@ -86,6 +86,18 @@ function url_to_file(src_url, not_dir) {
   return [filename,dirname]
 }
 
+function queue_html(content){
+    var $ = cheerio.load(content);
+    var links = $("a");
+    enqueue_links($, links, "href");
+    var css = $("link[rel=stylesheet]");
+    enqueue_links($, css, "href");
+    var js = $("script");
+    enqueue_links($, js, "src");
+    var img = $("img");
+    enqueue_links($, img, "src");        
+}
+
 function process_link(current) {
     
   var [checkfile,checkdir] = url_to_file(current,false)
@@ -93,16 +105,31 @@ function process_link(current) {
     var content = fs.readFileSync(checkdir+checkfile,'utf8');
     visited[current] = true;
     console.log("got "+current +" already");
+    if (content.match(/401 Authorization Required/)) {
+        console.log("but "+current +" is a 401 bad file");
+          request({
+            url: 'https://mention.tech/getfromarchive?url='+current,
+            timeout: http_timeout,
+          }, function(error,response,body) {
+
+            if(error) {
+              console.log(error);
+            } else if(response.statusCode == 404) {
+              console.log("404 Not Found");
+            } else {
+              if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
+                fs.writeFileSync(dirname+filename, body, 'utf8');
+              } else {
+                request.get(current).pipe(fs.createWriteStream(dirname+filename));
+              }
+                if (checkfile.match(/html/) || body.match(/html/)) {
+                    queue_html(body)       
+                }             
+            }
+        })
+    }
     if (checkfile.match(/html/) || content.match(/html/)) {
-        var $ = cheerio.load(content);
-        var links = $("a");
-        enqueue_links($, links, "href");
-        var css = $("link[rel=stylesheet]");
-        enqueue_links($, css, "href");
-        var js = $("script");
-        enqueue_links($, js, "src");
-        var img = $("img");
-        enqueue_links($, img, "src");        
+        queue_html(content)       
     }
     
   } catch(err){
@@ -150,6 +177,10 @@ function process_link(current) {
       console.log("404 Not Found");
       ready = true;
       running--;
+    } else if(response.statusCode == 401) {
+      console.log("401 Permission Denied");
+      ready = true;
+      running--;
     } else {
 
       // Find out if we followed any redirects to get here
@@ -181,7 +212,6 @@ function process_link(current) {
         // httpreq.download(current, dirname+filename);
 
       // Now parse the file looking for other links to follow, and queue them up
-      var $ = cheerio.load(body);
 
       if(response.headers['content-type'] && response.headers['content-type'].match(/css/)) {
         response.body.replace(/url\(([^\)]+)\)/g, function(a,u) {
@@ -197,15 +227,8 @@ function process_link(current) {
 
       } else {
         // assume HTML if it's not JS or CSS
-        var links = $("a");
-        enqueue_links($, links, "href");
-        var css = $("link[rel=stylesheet]");
-        enqueue_links($, css, "href");
-        var js = $("script");
-        enqueue_links($, js, "src");
-        var img = $("img");
-        enqueue_links($, img, "src");
-      }
+        queue_html(body)
+    }
 
       ready = true;
       running--;
