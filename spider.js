@@ -93,9 +93,25 @@ function process_link(current) {
     var content = fs.readFileSync(checkdir+checkfile,'utf8');
     visited[current] = true;
     console.log("got "+current +" already");
+    if (checkfile.match(/html/) || content.match(/html/)) {
+        var $ = cheerio.load(content);
+        var links = $("a");
+        enqueue_links($, links, "href");
+        var css = $("link[rel=stylesheet]");
+        enqueue_links($, css, "href");
+        var js = $("script");
+        enqueue_links($, js, "src");
+        var img = $("img");
+        enqueue_links($, img, "src");        
+    }
+    
   } catch(err){
     if (err.code != 'ENOENT'){
         console.log(err);
+        if (err.code == 'ENAMETOOLONG'){
+            visited[current] = true;
+            console.log("skipping because this is not a good link")
+        }            
     }        
   }
   
