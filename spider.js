@@ -59,6 +59,7 @@ function loop() {
 
 function archivefromcurrent(current) {
     return 'https://mention.tech/getfromarchive?url='+current;
+    //return current.replace('tummelvision.tv/','tummelvision.wpengine.com/')
 }
 
 function store_redirect(from, to) {
@@ -102,6 +103,7 @@ function queue_html(content){
     enqueue_links($, js, "src");
     var img = $("img");
     enqueue_links($, img, "src");        
+    enqueue_linkslist($, img, "srcset");        
 }
 function save_and_queue(current,error,response,body) {
 
@@ -278,6 +280,25 @@ function enqueue_links($, links, selector) {
       }
 
       enqueue_link(next_url);
+    }
+  }
+}
+function enqueue_linkslist($, linkslist, selector) {
+  for(var i = 0; i < linkslist.length; i++) {
+    var a = linkslist[i];
+    var next_list = $(a).attr(selector);
+    if(next_list) {
+      var links = next_list.split(",");
+      for(var j = 0; j < links.length; j++) {
+          var next_url_bit = links[j].trim().split(" ");
+          var next_url = next_url_bit[0];
+          // Node's url.parse doesn't properly parse URLs with no scheme
+          if(next_url.match(/^\/\//)) {
+            next_url = "http://"+next_url;
+          }
+
+          enqueue_link(next_url);
+      }
     }
   }
 }
