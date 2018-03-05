@@ -149,7 +149,7 @@ function save_and_queue(current,error,response,body) {
         fs.writeFileSync(dirname+filename, body, 'utf8');
         console.log("writing utf8 body: "+dirname+filename);
       } else if (archivefirst) {
-            request.get(archivefromcurrent(current).pipe(fs.createWriteStream(dirname+filename));
+            request.get(archivefromcurrent(current)).pipe(fs.createWriteStream(dirname+filename));
             console.log("writing raw pipe from archive via "+current+" to: "+dirname+filename);
         } else {
             request.get(current).pipe(fs.createWriteStream(dirname+filename));
@@ -194,7 +194,7 @@ function save_and_queue_archive(current,error,response,body) {
         fs.writeFileSync(dirname+filename, body, 'utf8');
         console.log("arch writing utf8 body: "+dirname+filename);
       } else {
-        request.get(archivefromcurrent(current).pipe(fs.createWriteStream(dirname+filename));
+        request.get(archivefromcurrent(current)).pipe(fs.createWriteStream(dirname+filename));
         console.log("arch writing  raw pipe from mentiontech "+current+" to: "+dirname+filename);
       }
         if (filename.match(/html/) || body.match(/html/)) {
