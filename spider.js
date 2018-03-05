@@ -7,6 +7,10 @@ var url = require('url');
 var http = require('http');
 
 var host = process.argv[2];
+console.log("host:" +host);
+var archivefirst = process.argv[3];
+
+console.log("archivefirst:" +archivefirst);
 
 // TODO: make sure host is set
 
@@ -53,7 +57,9 @@ function loop() {
   }
 }
 
-
+function archivefromcurrent(current) {
+    return 'https://mention.tech/getfromarchive?url='+current;
+}
 
 function store_redirect(from, to) {
   var redirects = fs.openSync(output_dir+"/.htaccess", "a");
@@ -110,7 +116,7 @@ function save_and_queue(current,error,response,body) {
     } else if(response.statusCode == 401) {
       console.log("401 Permission Denied for "+current);
       request({
-            url: 'https://mention.tech/getfromarchive?url='+current,
+            url: archivefromcurrent(current),
             timeout: http_timeout,
           }, function(error,response,body) {
                 save_and_queue_archive(current,error,response,body)
@@ -141,11 +147,14 @@ function save_and_queue(current,error,response,body) {
       fstools.mkdirSync(dirname);
       if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
         fs.writeFileSync(dirname+filename, body, 'utf8');
-      } else {
-        request.get(current).pipe(fs.createWriteStream(dirname+filename));
+        console.log("writing utf8 body: "+dirname+filename);
+      } else if (archivefirst) {
+            request.get(archivefromcurrent(current).pipe(fs.createWriteStream(dirname+filename));
+            console.log("writing raw pipe from archive via "+current+" to: "+dirname+filename);
+        } else {
+            request.get(current).pipe(fs.createWriteStream(dirname+filename));
+            console.log("writing  raw pipe from "+current+" to: "+dirname+filename);
       }
-
-        // httpreq.download(current, dirname+filename);
 
       // Now parse the file looking for other links to follow, and queue them up
 
@@ -180,10 +189,13 @@ function save_and_queue_archive(current,error,response,body) {
     } else {
       console.log("internet archive had "+current);
       var [filename,dirname] = url_to_file(current,response.headers['content-type'] && response.headers['content-type'].match(/image/))
+      fstools.mkdirSync(dirname);
       if(response.headers['content-type'] && response.headers['content-type'].match(/text/)) {
         fs.writeFileSync(dirname+filename, body, 'utf8');
+        console.log("arch writing utf8 body: "+dirname+filename);
       } else {
-        request.get(current).pipe(fs.createWriteStream(dirname+filename));
+        request.get(archivefromcurrent(current).pipe(fs.createWriteStream(dirname+filename));
+        console.log("arch writing  raw pipe from mentiontech "+current+" to: "+dirname+filename);
       }
         if (filename.match(/html/) || body.match(/html/)) {
             queue_html(body)       
@@ -197,10 +209,10 @@ function process_link(current) {
     var content = fs.readFileSync(checkdir+checkfile,'utf8');
     visited[current] = true;
     console.log("got "+current +" already");
-    if (content.match(/401 Authorization Required/)) {
-        console.log("but "+current +" is a 401 bad file");
+    if (content.match(/401 Authorization Required/) || content.match(/<h1>404 Not Found/)) {
+        console.log("but "+current +" is a bad file");
           request({
-            url: 'https://mention.tech/getfromarchive?url='+current,
+            url: archivefromcurrent(current),
             timeout: http_timeout,
           }, function(error,response,body) {
                 save_and_queue_archive(current,error,response,body)
@@ -231,9 +243,13 @@ function process_link(current) {
   console.log("Processing: " + current);
 
   visited[current] = true;
-
+  var fetchurl = current;
+  if (archivefirst) {
+    fetchurl = archivefromcurrent(current);
+    }
+  console.log("Fetching: " + fetchurl);
   request({
-    url: current,
+    url: fetchurl,
     timeout: http_timeout,
     followRedirect: function(response) {
       var redirect = url.parse(response.headers.location);
